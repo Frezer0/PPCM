@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { createStore } from "./store.mjs";
 import { createAuth, requireRole } from "./auth.mjs";
 import { configuration } from "./config.mjs";
+import { databaseConfiguration } from "./database-config.mjs";
 import { clientDownloads } from "./client-download.mjs";
 import { readExcel, exportExcel, ValidationError } from "./excel.mjs";
 import { filterRecords } from "../shared/domain.mjs";
@@ -17,21 +18,7 @@ let store;
 if (config.cloud) {
   const { Pool } = await import("pg");
   const { createPgStore } = await import("./pg-store.mjs");
-  const databaseUrl = new URL(process.env.DATABASE_URL);
-  for (const key of ["sslmode", "sslcert", "sslkey", "sslrootcert"])
-    databaseUrl.searchParams.delete(key);
-  const pool = new Pool({
-    connectionString: databaseUrl.toString(),
-    max: 5,
-    connectionTimeoutMillis: 15000,
-    idleTimeoutMillis: 30000,
-    ssl: {
-      rejectUnauthorized: true,
-      ...(process.env.SUPABASE_CA_CERT
-        ? { ca: process.env.SUPABASE_CA_CERT.replace(/\\n/g, "\n") }
-        : {}),
-    },
-  });
+  const pool = new Pool(databaseConfiguration());
   pool.on("error", (error) =>
     console.error("PostgreSQL:", error.code || "error de conexión"),
   );

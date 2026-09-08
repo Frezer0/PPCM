@@ -13,7 +13,7 @@ La web y el cliente Windows usan el mismo servidor de Render. El servidor guarda
 5. Si la contraseña contiene caracteres reservados de una URL, como `@`, `#`, `/` o `%`, deben estar codificados en la URI. No pegues esta conexión en GitHub ni en el código.
 6. Copia la **Project URL** y la **publishable key** del panel de claves API del proyecto. También se admite la clave pública heredada `anon`. No necesitas una clave `service_role` ni una secret key para esta aplicación.
 
-El Session pooler es la alternativa para una conexión persistente que necesita IPv4. La dirección y el certificado raíz se obtienen del propio proyecto. [Conexión PostgreSQL de Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres), [claves API](https://supabase.com/docs/guides/getting-started/api-keys).
+El Session pooler es la alternativa para una conexión persistente que necesita IPv4. El servidor incluye el certificado público oficial de Supabase y lo utiliza automáticamente con sus dominios de PostgreSQL. [Conexión PostgreSQL de Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres), [claves API](https://supabase.com/docs/guides/getting-started/api-keys).
 
 ## 2. Crear tu cuenta administradora
 
@@ -62,7 +62,7 @@ Start Command: npm start
 Health Check Path: /api/health
 ```
 
-Añade también las variables del Blueprint en ese caso. [Despliegue de Express](https://render.com/docs/deploy-node-express-app), [referencia de Blueprints](https://render.com/docs/blueprint-spec).
+Añade también las variables del Blueprint en ese caso. El archivo `.node-version` fija Node.js 24.15.0 también para servicios creados manualmente. Si ya existe `NODE_VERSION` en Environment, su valor tiene prioridad: debe ser `24.15.0`. [Despliegue de Express](https://render.com/docs/deploy-node-express-app), [referencia de Blueprints](https://render.com/docs/blueprint-spec), [selección de Node.js](https://render.com/docs/node-version).
 
 ## 4. Primera entrada y carga de archivos
 
@@ -98,7 +98,7 @@ Las actualizaciones de la web llegan al cliente al recargar. Cuando se actualice
 
 - **Falta una variable:** revisa Environment en Render y vuelve a desplegar. En modo compartido la aplicación no recurre a SQLite si falta Supabase.
 - **Error de autenticación PostgreSQL:** revisa la contraseña de la base, su codificación y el usuario completo del pooler.
-- **Error de certificado SSL:** obtiene el certificado raíz desde el proyecto Supabase y configura su contenido PEM en `SUPABASE_CA_CERT` en Render. Se admiten saltos de línea reales o `\n`. La aplicación verifica el certificado y no desactiva TLS.
+- **Error `SELF_SIGNED_CERT_IN_CHAIN`:** despliega el código más reciente; el servidor incluye el certificado público oficial de Supabase. Si configuraste `SUPABASE_CA_CERT`, ese valor tiene prioridad y debe contener un certificado válido y completo. Para una autoridad distinta o una futura rotación, descarga el certificado desde **Database Settings → SSL Configuration → Download certificate** en Supabase y pega su contenido PEM en `SUPABASE_CA_CERT` en Render. La aplicación mantiene la verificación TLS y del nombre del servidor.
 - **Cuenta sin acceso:** confirma el correo en Supabase Auth y verifica que coincida con `BOOTSTRAP_ADMIN_EMAIL` o con un miembro activo de PPCM.
 - **Origen no autorizado:** `PUBLIC_APP_URL`, si lo configuraste, debe coincidir exactamente con el dominio utilizado, sin rutas.
 - **Carga pendiente vencida:** vuelve a elegir los Excel. La vista previa dura 20 minutos y se pierde al reiniciar o desplegar el servidor; una carga ya confirmada permanece en Supabase.

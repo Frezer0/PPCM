@@ -4,7 +4,69 @@ import { PGlite } from "@electric-sql/pglite";
 import { createPgStore } from "../server/pg-store.mjs";
 import { createAuth, requireRole } from "../server/auth.mjs";
 import { configuration } from "../server/config.mjs";
+import { databaseConfiguration } from "../server/database-config.mjs";
+import { readFileSync } from "node:fs";
+import { X509Certificate } from "node:crypto";
+import { Client } from "pg";
 import { normalizeRecord } from "../shared/domain.mjs";
+
+const supabaseCA = readFileSync(
+  new URL("../server/certs/supabase-prod-ca-2021.crt", import.meta.url),
+  "utf8",
+);
+test("certificado Supabase incluido corresponde a la CA pública oficial vigente", () => {
+  const cert = new X509Certificate(supabaseCA);
+  assert.equal(cert.ca, true);
+  assert.equal(
+    cert.fingerprint256,
+    "80:70:25:AD:50:D4:ED:21:9D:2C:9C:7D:29:9C:00:4F:82:4E:B0:0C:F7:F6:5A:FE:F6:07:D0:7B:72:E6:CA:FA",
+  );
+  assert.ok(Date.now() < Date.parse(cert.validTo));
+});
+
+test("PostgreSQL confía en Supabase solo para sus dominios y conserva verificación TLS", () => {
+  for (const host of [
+    "aws-0-us-west-2.pooler.supabase.com",
+    "db.example.supabase.co",
+  ]) {
+    const config = databaseConfiguration({
+      DATABASE_URL: `postgresql://user:test@${host}:5432/postgres?sslmode=disable&ssl=false&sslrootcert=ignored.crt&application_name=ppcm`,
+    });
+    const client = new Client(config);
+    assert.equal(client.connectionParameters.ssl.rejectUnauthorized, true);
+    assert.ok(client.connectionParameters.ssl.ca.includes(supabaseCA));
+    assert.equal(
+      new URL(config.connectionString).searchParams.has("sslmode"),
+      false,
+    );
+    assert.equal(
+      new URL(config.connectionString).searchParams.get("application_name"),
+      "ppcm",
+    );
+  }
+  for (const host of [
+    "localhost",
+    "pooler.supabase.com.example.test",
+    "db.example.supabase.co.example.test",
+  ]) {
+    const config = databaseConfiguration({
+      DATABASE_URL: `postgresql://user:test@${host}:5432/postgres`,
+    });
+    assert.deepEqual(config.ssl, { rejectUnauthorized: true });
+  }
+});
+
+test("certificado explícito acepta PEM o saltos escapados y mantiene prioridad", () => {
+  for (const value of [supabaseCA, supabaseCA.replace(/\n/g, "\\n")]) {
+    const config = databaseConfiguration({
+      DATABASE_URL:
+        "postgresql://user:test@aws-0-us-west-2.pooler.supabase.com:5432/postgres",
+      SUPABASE_CA_CERT: value,
+    });
+    assert.equal(config.ssl.ca, supabaseCA.trim());
+    assert.equal(config.ssl.rejectUnauthorized, true);
+  }
+});
 
 test("modo Render exige configuración completa y nunca inicia con base local", () => {
   assert.throws(() => configuration({ RENDER: "true" }), /DATABASE_URL/);

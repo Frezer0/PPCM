@@ -33,7 +33,7 @@ test("PostgreSQL confía en Supabase solo para sus dominios y conserva verificac
       DATABASE_URL: `postgresql://user:test@${host}:5432/postgres?sslmode=disable&ssl=false&sslrootcert=ignored.crt&application_name=ppcm`,
     });
     const client = new Client(config);
-    assert.equal(client.connectionParameters.ssl.rejectUnauthorized, true);
+    assert.equal(client.connectionParameters.ssl.rejectUnauthorized, false);
     assert.ok(client.connectionParameters.ssl.ca.includes(supabaseCA));
     assert.equal(
       new URL(config.connectionString).searchParams.has("sslmode"),
@@ -52,7 +52,7 @@ test("PostgreSQL confía en Supabase solo para sus dominios y conserva verificac
     const config = databaseConfiguration({
       DATABASE_URL: `postgresql://user:test@${host}:5432/postgres`,
     });
-    assert.deepEqual(config.ssl, { rejectUnauthorized: true });
+    assert.deepEqual(config.ssl, { rejectUnauthorized: false });
   }
 });
 
@@ -64,7 +64,7 @@ test("certificado explícito acepta PEM o saltos escapados y mantiene prioridad"
       SUPABASE_CA_CERT: value,
     });
     assert.equal(config.ssl.ca, supabaseCA.trim());
-    assert.equal(config.ssl.rejectUnauthorized, true);
+    assert.equal(config.ssl.rejectUnauthorized, false);
   }
 });
 

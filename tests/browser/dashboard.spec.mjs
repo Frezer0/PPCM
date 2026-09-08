@@ -1,0 +1,96 @@
+import { test, expect } from '@playwright/test';
+import path from 'node:path';
+import ExcelJS from 'exceljs';
+
+test('resumen, filtros, búsqueda, seguimiento persistente, exportación e importación', async ({ page, request }) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Resumen de mantenimiento', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Órdenes de mantenimiento 2.727/ })).toBeVisible();
+  await expect(page.getByText('5.594 de 5.594 registros')).toBeVisible();
+  await expect(page.locator('.recharts-pie-sector')).toHaveCount(5);
+  await page.screenshot({ path: 'test-results/dashboard-desktop.png', fullPage: true, animations: 'disabled' });
+  await page.getByLabel('Zona / centro', { exact: true }).selectOption('Chillán');
+  const all = await (await request.get('/api/data')).json();
+  const ch = all.records.filter(r => r.zone === 'Chillán').length;
+  await expect(page.getByText(`${ch.toLocaleString('es-CL')} de 5.594 registros`)).toBeVisible();
+  await page.getByRole('button', { name: 'Limpiar filtros', exact: true }).click();
+  await page.getByRole('button', { name: /Órdenes de trabajo/ }).click();
+  await page.getByRole('textbox', { name: 'Buscar registros' }).fill('11461316');
+  await expect(page.locator('.records-table tbody tr')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Abrir 11461316', exact: true }).click();
+  await page.getByRole('tab', { name: 'Seguimiento', exact: true }).click();
+  await page.getByLabel('Programador asignado', { exact: false }).fill('Juan · prueba de navegador');
+  await page.getByLabel('Estado de seguimiento').selectOption('En gestión');
+  await page.getByLabel('Fecha de compromiso').fill('2026-10-01');
+  await page.getByLabel('Observaciones', { exact: false }).fill('Revisar materiales antes de programar.');
+  await page.getByRole('button', { name: 'Guardar seguimiento', exact: true }).click();
+  await expect(page.getByText('Seguimiento guardado correctamente.')).toBeVisible();
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.reload();
+  await page.getByRole('textbox', { name: 'Buscar registros' }).fill('11461316');
+  await page.getByRole('button', { name: 'Abrir 11461316', exact: true }).click();
+  await page.getByRole('tab', { name: 'Seguimiento', exact: true }).click();
+  await expect(page.getByLabel('Observaciones', { exact: false })).toHaveValue('Revisar materiales antes de programar.');
+  await page.getByRole('tab', { name: 'Historial', exact: true }).click();
+  await expect(page.locator('.activity-list')).toContainText('En gestión');
+  await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Exportar Excel', exact: true }).click();
+  const download = await downloadPromise;
+  const workbook = new ExcelJS.Workbook(); await workbook.xlsx.readFile(await download.path());
+  expect(workbook.getWorksheet('OMs IW38').rowCount).toBe(2);
+  await page.getByRole('button', { name: 'Limpiar búsqueda', exact: true }).click();
+  await page.getByRole('button', { name: 'Actualizar datos', exact: true }).click();
+  await page.getByLabel('Seleccionar archivos Excel').setInputFiles([path.resolve('Avisos IW28.xlsx'), path.resolve('OMs IW38.xlsx')]);
+  await expect(page.getByRole('button', { name: 'Confirmar importación', exact: false })).toBeEnabled();
+  await page.screenshot({ path: 'test-results/import-preview.png', fullPage: true, animations: 'disabled' });
+  await page.getByRole('button', { name: 'Confirmar importación', exact: false }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const afterImport = await (await request.get('/api/data')).json();
+  expect(afterImport.records.length).toBe(5594);
+  expect(afterImport.records.find(r => r.key === 'order:11461316').followup.notes).toBe('Revisar materiales antes de programar.');
+  expect(afterImport.history.length).toBe(4);
+  expect(errors).toEqual([]);
+});
+
+test('todas las vistas, estado vacío y diseño móvil sin desbordamiento de página', async ({ page, request }) => {
+  const errors = []; page.on('pageerror', e => errors.push(e.message));
+  const before = await (await request.get('/api/data')).json();
+  const record = before.records.find(r => r.key === 'order:11461316');
+  await request.put('/api/records/order%3A11461316', { data: { planner: 'Juan · prueba de navegador', state: 'En gestión', dueDate: '2020-01-01', notes: 'Compromiso de prueba', version: record.followup?.version || 0 } });
+  await page.goto('/');
+  for (const label of ['Carga de trabajo', 'Análisis de costos', 'Auditoría y seguimiento', 'Fuentes de datos', 'Configuración']) {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await expect(page.locator('main h1')).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Auditoría y seguimiento', exact: true }).click();
+  await page.getByRole('button', { name: /Con seguimiento/ }).click();
+  await expect(page.locator('.records-table tbody tr')).toHaveCount(1);
+  await page.getByRole('button', { name: /Compromisos vencidos/ }).click();
+  await expect(page.locator('.records-table tbody tr')).toHaveCount(1);
+  await page.getByRole('button', { name: /Órdenes de trabajo/ }).click();
+  await page.getByRole('textbox', { name: 'Buscar registros' }).fill('registro-inexistente-xxzz');
+  await expect(page.getByText('No hay registros para esta selección').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Limpiar búsqueda' }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('button', { name: 'Abrir menú' }).click();
+  await page.getByRole('button', { name: 'Resumen general', exact: true }).click();
+  await expect(page.locator('.sidebar')).not.toHaveClass(/open/);
+  await expect(page.getByRole('heading', { name: 'Resumen de mantenimiento', exact: true })).toBeVisible();
+  await page.screenshot({ path: 'test-results/dashboard-mobile.png', fullPage: true, animations: 'disabled' });
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  expect(overflow).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('API rechaza importación inválida y escrituras desde otro origen', async ({ request }) => {
+  const before = await (await request.get('/api/data')).json();
+  const response = await request.post('/api/import/preview', { headers: { 'Content-Type': 'application/octet-stream', 'X-Filename': 'invalido.xlsx' }, data: Buffer.from('invalid') });
+  expect(response.status()).toBe(400);
+  const origin = await request.put('/api/settings', { headers: { Origin: 'https://example.test' }, data: { currency: 'USD', workspaceName: 'No autorizado' } });
+  expect(origin.status()).toBe(403);
+  const after = await (await request.get('/api/data')).json();
+  expect(after.history.length).toBe(before.history.length);
+  expect(after.settings).toEqual(before.settings);
+});

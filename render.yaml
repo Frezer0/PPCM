@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: ppcm-dashboard
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_VERSION
+        value: 24.15.0
+      - key: PPCM_MODE
+        value: cloud
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        sync: false
+      - key: GITHUB_REPOSITORY
+        value: Frezer0/PPCM

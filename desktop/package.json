@@ -1,0 +1,17 @@
+{
+  "name": "ppcm-windows",
+  "version": "1.1.0",
+  "description": "Cliente Windows de PPCM Gestión de Mantenimiento",
+  "author": "PPCM",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist": "node prepare.cjs && electron-builder --config electron-builder.config.cjs --win nsis --x64 --publish never && node manifest.cjs"
+  },
+  "devDependencies": {
+    "electron": "44.2.0",
+    "electron-builder": "26.15.3"
+  }
+}

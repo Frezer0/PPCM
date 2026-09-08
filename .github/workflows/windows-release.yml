@@ -1,0 +1,46 @@
+name: Publicar cliente Windows
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Versión nueva (por ejemplo 1.1.1)"
+        required: true
+        default: "1.1.1"
+      dashboard_url:
+        description: "URL HTTPS de Render (vacía para configurar al iniciar)"
+        required: false
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Preparar versión
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          if ($env:RELEASE_VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Versión inválida' }
+          npm pkg set "version=$env:RELEASE_VERSION" --prefix desktop
+      - run: npm ci --prefix desktop
+      - name: Generar instalador
+        env:
+          PPCM_DEFAULT_SERVER_URL: ${{ inputs.dashboard_url || vars.PPCM_DEFAULT_SERVER_URL }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+        run: npm run dist --prefix desktop
+      - name: Publicar release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $tag = "v$env:RELEASE_VERSION"
+          $installer = "desktop/release/PPCM-Setup-$env:RELEASE_VERSION-x64.exe"
+          gh release create $tag $installer desktop/release/client-manifest.json --target $env:GITHUB_SHA --title "PPCM Windows $env:RELEASE_VERSION" --notes-file docs/RELEASE-NOTES.md

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'"
+    />
+    <title>Conectar PPCM</title>
+    <link rel="stylesheet" href="setup.css" />
+  </head>
+  <body>
+    <main>
+      <div class="brand">
+        <img src="build/icon.png" width="50" height="50" alt="" /><span
+          >PPCM<small>MANTENIMIENTO</small></span
+        >
+      </div>
+      <p class="eyebrow">TU ESPACIO DE TRABAJO</p>
+      <h1>Tu operación, siempre a mano.</h1>
+      <p class="intro">
+        Conecta la aplicación de Windows con tu dashboard. Verás los mismos
+        avisos, órdenes y seguimiento que en la versión web.
+      </p>
+      <form id="connection-form">
+        <label for="server-url">Dirección del dashboard</label
+        ><input
+          id="server-url"
+          type="url"
+          required
+          placeholder="https://tu-dashboard.onrender.com"
+          spellcheck="false"
+          autocomplete="url"
+        /><small>Usa la dirección que te entregó el administrador.</small>
+        <div id="message" role="status" hidden></div>
+        <button id="connect-button">Conectar con mi dashboard</button>
+      </form>
+      <footer>
+        <span>Windows · Conexión segura</span><span id="version"></span>
+      </footer>
+    </main>
+    <script src="setup.js"></script>
+  </body>
+</html>

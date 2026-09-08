@@ -18,10 +18,10 @@ let store;
 if (config.cloud) {
   const { Pool } = await import("pg");
   const { createPgStore } = await import("./pg-store.mjs");
-  const pool = new Pool(databaseConfiguration());
-  pool.on("error", (error) =>
-    console.error("PostgreSQL:", error.code || "error de conexión"),
-  );
+  const pool = new Pool({
+    ...databaseConfiguration(),
+    ssl: { rejectUnauthorized: false }
+  });
   store = await createPgStore(pool);
   await store.bootstrapAdmin(process.env.BOOTSTRAP_ADMIN_EMAIL);
 } else {

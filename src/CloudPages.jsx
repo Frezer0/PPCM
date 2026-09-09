@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { api, decimal } from "./lib";
 import { CardTitle, Spinner } from "./components";
+import { AccessSettings } from "./AccessSettings";
+import { OnlineUsers } from "./OnlineUsers";
 export function WindowsClient({ session, notify }) {
   const [info, setInfo] = useState(null),
     [error, setError] = useState("");
@@ -139,7 +141,10 @@ export function Members({ notify }) {
   const [members, setMembers] = useState(null),
     [busy, setBusy] = useState(false);
   const [form, setForm] = useState({
+    id: "",
     email: "",
+    password: "",
+    login_mode: "password",
     display_name: "",
     role: "editor",
     active: true,
@@ -155,9 +160,23 @@ export function Members({ notify }) {
     event.preventDefault();
     setBusy(true);
     try {
-      await api("/members", { method: "PUT", body: JSON.stringify(form) });
+      await api("/members", {
+        method: "PUT",
+        body: JSON.stringify({
+          ...form,
+          login_mode: form.password ? "password" : form.login_mode,
+        }),
+      });
       await load();
-      setForm({ email: "", display_name: "", role: "editor", active: true });
+      setForm({
+        id: "",
+        email: "",
+        password: "",
+        login_mode: "password",
+        display_name: "",
+        role: "editor",
+        active: true,
+      });
       notify("Acceso guardado.");
     } catch (e) {
       notify(e.message, "error");
@@ -166,100 +185,147 @@ export function Members({ notify }) {
     }
   }
   return (
-    <div className="settings-layout">
-      <form className="card settings-card" onSubmit={save}>
-        <CardTitle
-          title="Dar acceso al espacio"
-          subtitle="La cuenta del correo debe existir en Supabase Auth"
-        />
-        <label className="form-field">
-          Correo
-          <input
-            required
-            type="email"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
+    <div className="page-stack">
+      <AccessSettings notify={notify} />
+      <OnlineUsers />
+      <div className="settings-layout">
+        <form className="card settings-card" onSubmit={save}>
+          <CardTitle
+            title={form.id ? "Editar usuario" : "Crear usuario"}
+            subtitle="Gestiona el correo, la contraseña y los permisos"
           />
-        </label>
-        <label className="form-field">
-          Nombre
-          <input
-            required
-            maxLength={80}
-            value={form.display_name}
-            onChange={(e) => setForm({ ...form, display_name: e.target.value })}
-          />
-        </label>
-        <label className="form-field">
-          Rol
-          <select
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="viewer">Consulta · ver y exportar</option>
-            <option value="editor">Editor · seguimiento e importación</option>
-            <option value="admin">Administrador · acceso completo</option>
-          </select>
-        </label>
-        <label className="member-active">
-          <input
-            type="checkbox"
-            checked={form.active}
-            onChange={(e) => setForm({ ...form, active: e.target.checked })}
-          />
-          Acceso activo
-        </label>
-        <button className="button primary" disabled={busy}>
-          <Users size={16} />
-          {busy ? "Guardando…" : "Guardar acceso"}
-        </button>
-      </form>
-      <section className="card table-card">
-        <CardTitle title="Usuarios del espacio" />
-        {members === null ? (
-          <Spinner />
-        ) : (
-          <div className="table-scroll">
-            <table className="matrix-table">
-              <thead>
-                <tr>
-                  <th>Usuario</th>
-                  <th>Rol</th>
-                  <th>Acceso</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((m) => (
-                  <tr key={m.id}>
-                    <td>
-                      {m.display_name}
-                      <small className="member-email">{m.email}</small>
-                    </td>
-                    <td>{m.role}</td>
-                    <td>{m.active ? "Activo" : "Desactivado"}</td>
-                    <td>
-                      <button
-                        className="text-button"
-                        onClick={() =>
-                          setForm({
-                            email: m.email,
-                            display_name: m.display_name,
-                            role: m.role,
-                            active: m.active,
-                          })
-                        }
-                      >
-                        Editar
-                      </button>
-                    </td>
+          <label className="form-field">
+            Correo
+            <input
+              required
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+          </label>
+          <label className="form-field">
+            Nombre
+            <input
+              required
+              maxLength={80}
+              value={form.display_name}
+              onChange={(e) =>
+                setForm({ ...form, display_name: e.target.value })
+              }
+            />
+          </label>
+          <label className="form-field">
+            {form.id ? "Nueva contraseña" : "Contraseña"}
+            <input
+              type="password"
+              aria-label={form.id ? "Nueva contraseña" : "Contraseña"}
+              autoComplete="new-password"
+              required={!form.id}
+              minLength={8}
+              maxLength={256}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
+            <small>
+              {form.id
+                ? "Deja vacío para conservar la contraseña actual. Para cambiarla, escribe al menos 8 caracteres."
+                : "Al menos 8 caracteres. El usuario podrá ingresar con su correo y esta contraseña."}
+            </small>
+          </label>
+          <label className="form-field">
+            Rol
+            <select
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+            >
+              <option value="viewer">Consulta · ver y exportar</option>
+              <option value="editor">Editor · seguimiento e importación</option>
+              <option value="admin">Administrador · acceso completo</option>
+            </select>
+          </label>
+          <label className="member-active">
+            <input
+              type="checkbox"
+              checked={form.active}
+              onChange={(e) => setForm({ ...form, active: e.target.checked })}
+            />
+            Acceso activo
+          </label>
+          <button className="button primary" disabled={busy}>
+            <Users size={16} />
+            {busy ? "Guardando…" : "Guardar acceso"}
+          </button>
+          {form.id && (
+            <button
+              type="button"
+              className="button"
+              disabled={busy}
+              onClick={() =>
+                setForm({
+                  id: "",
+                  email: "",
+                  password: "",
+                  login_mode: "password",
+                  display_name: "",
+                  role: "editor",
+                  active: true,
+                })
+              }
+            >
+              Cancelar edición
+            </button>
+          )}
+        </form>
+        <section className="card table-card">
+          <CardTitle title="Usuarios del espacio" />
+          {members === null ? (
+            <Spinner />
+          ) : (
+            <div className="table-scroll">
+              <table className="matrix-table">
+                <thead>
+                  <tr>
+                    <th>Usuario</th>
+                    <th>Rol</th>
+                    <th>Acceso</th>
+                    <th />
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody>
+                  {members.map((m) => (
+                    <tr key={m.id}>
+                      <td>
+                        {m.display_name}
+                        <small className="member-email">{m.email}</small>
+                      </td>
+                      <td>{m.role}</td>
+                      <td>{m.active ? "Activo" : "Desactivado"}</td>
+                      <td>
+                        <button
+                          className="text-button"
+                          onClick={() =>
+                            setForm({
+                              id: m.id,
+                              email: m.email,
+                              password: "",
+                              login_mode: m.login_mode || "supabase",
+                              display_name: m.display_name,
+                              role: m.role,
+                              active: m.active,
+                            })
+                          }
+                        >
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

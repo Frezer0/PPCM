@@ -86,6 +86,9 @@ test("acceso compartido: login, permisos de consulta y gestión de miembros", as
       await route.fulfill({ json: { ok: true } });
     } else await route.fulfill({ json: members });
   });
+  await page.route("**/api/access-settings", (route) =>
+    route.fulfill({ json: { requireCredentials: true } }),
+  );
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Bienvenido a tu espacio." }),
@@ -142,6 +145,9 @@ test("acceso compartido: login, permisos de consulta y gestión de miembros", as
   ).toBeVisible();
   await page.getByLabel("Correo", { exact: true }).fill("editor@example.test");
   await page.getByLabel("Nombre", { exact: true }).fill("Editor de prueba");
+  await page
+    .getByLabel("Contraseña", { exact: true })
+    .fill("Editor-prueba-2026");
   await page
     .getByRole("button", { name: "Guardar acceso", exact: true })
     .click();

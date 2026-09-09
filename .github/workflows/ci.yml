@@ -15,5 +15,5 @@ jobs:
           node-version: "24"
           cache: npm
       - run: npm ci
-      - run: node --test tests/domain.test.mjs tests/cloud.test.mjs tests/desktop.test.mjs
+      - run: node --test tests/domain.test.mjs tests/cloud.test.mjs tests/access.test.mjs tests/desktop.test.mjs
       - run: npm run build

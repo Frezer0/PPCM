@@ -92,7 +92,7 @@ test("PostgreSQL: esquema, cargas atómicas, persistencia, control de versiones 
       ? Promise.resolve({ rows: [] })
       : params
         ? db.query(sql, params)
-        : sql.includes("CREATE SCHEMA")
+        : sql.includes("CREATE TABLE")
           ? db.exec(sql).then(() => ({ rows: [] }))
           : db.query(sql);
   const pool = {

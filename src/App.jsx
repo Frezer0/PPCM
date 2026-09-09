@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { MonitorDown, LogOut, Users } from "lucide-react";
 import { WindowsClient, Members } from "./CloudPages";
+import { usePresence } from "./usePresence";
 import { Filters, Spinner, EmptyState } from "./components";
 import {
   Overview,
@@ -123,6 +124,7 @@ const NAV = [
   },
 ];
 export default function App({ session, onLogout }) {
+  usePresence(session);
   const [data, setData] = useState(null),
     [error, setError] = useState("");
   const currentUser = data?.currentUser || session.user;

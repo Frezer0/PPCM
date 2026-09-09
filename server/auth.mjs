@@ -1,3 +1,7 @@
+import { verifyPassword } from "./passwords.mjs";
+import { randomUUID } from "node:crypto";
+import { isPresenceId } from "./presence.mjs";
+
 const LOCAL_USER = {
   id: "local",
   email: "",
@@ -22,6 +26,39 @@ export function createAuth({
   fetcher = fetch,
 }) {
   const attempts = new Map();
+  const guestAttempts = new Map();
+  function identifyPresence(req, res, user) {
+    if (user && store.recordPresence) {
+      const previous = cookies(req).ppcm_presence;
+      req.presenceSession = isPresenceId(previous) ? previous : randomUUID();
+      if (!isPresenceId(previous))
+        res.cookie("ppcm_presence", req.presenceSession, {
+          httpOnly: true,
+          secure: cloud,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 86400000,
+        });
+    }
+    return user;
+  }
+  async function retirePresence(req) {
+    try {
+      await store.endPresenceSession?.(cookies(req).ppcm_presence);
+    } catch {
+      /* Presence must not prevent sign-in or sign-out during a connection failure. */
+    }
+  }
+  function checkAttempts(key, guest = false) {
+    const limits = guest ? guestAttempts : attempts;
+    const now = Date.now();
+    for (const [ip, value] of limits) if (value.until < now) limits.delete(ip);
+    const limit = limits.get(key) || { count: 0, until: now + 15 * 60000 };
+    if (limit.count >= (guest ? 30 : 10))
+      throw fail("Demasiados intentos. Vuelve a intentar en 15 minutos.", 429);
+    limit.count++;
+    limits.set(key, limit);
+  }
   const setTokens = (res, tokens) => {
     const options = {
       httpOnly: true,
@@ -39,7 +76,13 @@ export function createAuth({
     });
   };
   const clear = (res) => {
-    for (const name of ["ppcm_access", "ppcm_refresh"])
+    for (const name of [
+      "ppcm_access",
+      "ppcm_refresh",
+      "ppcm_member",
+      "ppcm_guest",
+      "ppcm_presence",
+    ])
       res.clearCookie(name, {
         httpOnly: true,
         secure: cloud,
@@ -64,6 +107,16 @@ export function createAuth({
   async function current(req, res) {
     if (!cloud) return LOCAL_USER;
     const values = cookies(req);
+    if (values.ppcm_guest) {
+      const guest = await store.guestSession(values.ppcm_guest);
+      if (!guest) clear(res);
+      return identifyPresence(req, res, guest);
+    }
+    if (values.ppcm_member) {
+      const member = await store.sessionMember(values.ppcm_member);
+      if (!member) clear(res);
+      return identifyPresence(req, res, member);
+    }
     let authUser;
     if (values.ppcm_access) {
       try {
@@ -87,7 +140,7 @@ export function createAuth({
     if (!authUser) return null;
     const member = await store.memberFor(authUser);
     if (!member) clear(res);
-    return member;
+    return identifyPresence(req, res, member);
   }
   return {
     current,
@@ -96,35 +149,69 @@ export function createAuth({
       if (!req.user) throw fail("Inicia sesión para acceder al dashboard.");
       next();
     },
+    async guest(req, res) {
+      if (!cloud || !store.createGuestSession)
+        throw fail(
+          "El acceso de consulta se habilita en el modo compartido.",
+          400,
+        );
+      checkAttempts(req.ip, true);
+      const session = await store.createGuestSession(req.body?.name);
+      await retirePresence(req);
+      clear(res);
+      res.cookie("ppcm_guest", session.token, {
+        httpOnly: true,
+        secure: cloud,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 12 * 3600000,
+      });
+      res.json({ user: session.user });
+    },
     async login(req, res) {
       if (!cloud) return res.json({ user: LOCAL_USER });
+      const identifier = req.body?.email;
       if (
-        typeof req.body?.email !== "string" ||
-        req.body.email.length > 254 ||
+        typeof identifier !== "string" ||
+        !identifier.trim() ||
+        identifier.length > 254 ||
         typeof req.body.password !== "string" ||
+        !req.body.password ||
         req.body.password.length > 256
       )
         throw fail("Ingresa tu correo y contraseña.", 400);
-      const now = Date.now(),
-        key = req.ip;
-      for (const [ip, value] of attempts)
-        if (value.until < now) attempts.delete(ip);
-      const limit = attempts.get(key) || { count: 0, until: now + 15 * 60000 };
-      if (limit.count >= 10)
-        throw fail(
-          "Demasiados intentos. Vuelve a intentar en 15 minutos.",
-          429,
-        );
-      limit.count++;
-      attempts.set(key, limit);
+      const key = req.ip;
+      checkAttempts(key);
+      const credentials = await store.memberCredentials?.(identifier);
+      if (credentials?.login_mode === "password") {
+        if (
+          !credentials.active ||
+          !(await verifyPassword(req.body.password, credentials.password_hash))
+        )
+          throw fail("Usuario o contraseña incorrectos, o cuenta desactivada.");
+        const session = await store.createMemberSession(credentials);
+        attempts.delete(key);
+        await retirePresence(req);
+        clear(res);
+        res.cookie("ppcm_member", session.token, {
+          httpOnly: true,
+          secure: cloud,
+          sameSite: "lax",
+          path: "/",
+          maxAge: 7 * 86400000,
+        });
+        return res.json({ user: session.user });
+      }
+      if (!identifier.includes("@"))
+        throw fail("Usuario o contraseña incorrectos, o cuenta desactivada.");
       let tokens;
       try {
         tokens = await call("/token?grant_type=password", {
-          body: { email: req.body.email.trim(), password: req.body.password },
+          body: { email: identifier.trim(), password: req.body.password },
         });
       } catch {
         throw fail(
-          "Correo o contraseña incorrectos, o servicio no disponible.",
+          "Usuario o contraseña incorrectos, o servicio no disponible.",
         );
       }
       const member = await store.memberFor(
@@ -136,11 +223,19 @@ export function createAuth({
           403,
         );
       attempts.delete(key);
+      await retirePresence(req);
+      clear(res);
       setTokens(res, tokens);
       res.json({ user: member });
     },
     async logout(req, res) {
-      const token = cookies(req).ppcm_access;
+      await retirePresence(req);
+      const values = cookies(req);
+      if (cloud && values.ppcm_guest)
+        await store.revokeGuestSession(values.ppcm_guest);
+      if (cloud && values.ppcm_member)
+        await store.revokeMemberSession(values.ppcm_member);
+      const token = values.ppcm_access;
       if (cloud && token) {
         try {
           await call("/logout?scope=local", { token, body: {} });

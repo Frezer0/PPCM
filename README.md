@@ -8,7 +8,7 @@ Dashboard en español para analizar exportaciones SAP **IW28 (avisos)** e **IW38
 
 - **React + Vite:** interfaz adaptable, indicadores, gráficos, filtros y tablas.
 - **Express en Render:** API, importación/exportación Excel y control de acceso.
-- **Supabase:** PostgreSQL para datos e historial, Auth para las cuentas. Roles de administrador, editor y consulta.
+- **Supabase:** PostgreSQL para datos, historial y cuentas del dashboard; se mantiene el acceso de las cuentas existentes de Supabase Auth. Roles de administrador, editor y consulta.
 - **Electron para Windows:** instalador independiente; abre el mismo dashboard HTTPS y comparte sus datos. El usuario final no necesita Node.js ni Python. Requiere internet.
 - **GitHub:** código, comprobaciones automáticas y distribución del instalador desde Releases. El dashboard incluye la sección **Aplicación Windows** para descargarlo.
 
@@ -26,6 +26,9 @@ Para publicar, sigue [la guía de despliegue](docs/DESPLIEGUE.md). `render.yaml`
 - Planificación por mes o semana y auditoría de compromisos vencidos y asignaciones.
 - Importación con vista previa y validación; historial de cargas, restauración y respaldo completo para administradores.
 - Gestión de miembros y actualización de datos compartidos cada 30 segundos cuando no hay una edición abierta.
+- Creación y cambio de contraseñas desde **Usuarios y permisos**, sin crear previamente la cuenta en Supabase.
+- Lista de **Conectados y actividad reciente** para administradores: cuentas y visitantes, rol, estado de conexión y última señal del dashboard. Se actualiza cada 30 segundos; después de 90 segundos sin señales se muestra desconectado. Agrupa las pestañas y equipos de una cuenta y conserva las conexiones recientes de las últimas 24 horas.
+- Interruptor de **Inicio de sesión** para administradores: activado solicita correo y contraseña; desactivado permite entrar con cualquier nombre, solo para consultar y exportar. La edición y la administración siempre requieren una cuenta con contraseña.
 
 ## Usar localmente para desarrollo o trabajo individual
 
@@ -52,6 +55,8 @@ Los identificadores duplicados o inválidos bloquean la carga. La fila final de 
 Las reglas de asignación y prioridad están en `shared/domain.mjs`. Un responsable asignado manualmente tiene preferencia. Los estados de seguimiento pertenecen a PPCM y no actualizan SAP; marcar un seguimiento como resuelto no cierra una orden en SAP. La carga de trabajo se expresa en cantidad de órdenes, dado que los archivos no contienen horas de trabajo.
 
 Los administradores pueden descargar un JSON con datos, cargas, seguimiento y configuración. Para copiar la base SQLite directamente, detén el servicio y respalda toda la carpeta `data`.
+
+El ingreso con correo y contraseña está activado por defecto. Al reactivarlo, se revocan las sesiones de consulta sin contraseña; sus próximas solicitudes pedirán ingresar de nuevo. Las sesiones de consulta duran hasta 12 horas. Las contraseñas se almacenan mediante hashes scrypt y no se incluyen en respuestas, historial ni respaldos JSON. Tampoco se exportan los tokens de sesión. Si restauras las cuentas desde un respaldo JSON, deberás establecer nuevamente sus contraseñas.
 
 ## Compilar Windows
 

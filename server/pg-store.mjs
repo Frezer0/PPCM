@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { FOLLOWUP_STATES, dateValue } from "../shared/domain.mjs";
 import { ValidationError } from "./excel.mjs";
+import { createMemberAccess } from "./member-access.mjs";
+import { createPresence } from "./presence.mjs";
 
 const iso = (value) => (value instanceof Date ? value.toISOString() : value);
 const conflict = () =>
@@ -15,6 +17,18 @@ export async function createPgStore(pool) {
   await pool.query(
     await readFile(
       new URL("../supabase/migrations/001_ppcm.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  await pool.query(
+    await readFile(
+      new URL("../supabase/migrations/002_member_access.sql", import.meta.url),
+      "utf8",
+    ),
+  );
+  await pool.query(
+    await readFile(
+      new URL("../supabase/migrations/003_presence.sql", import.meta.url),
       "utf8",
     ),
   );
@@ -80,6 +94,8 @@ export async function createPgStore(pool) {
       )
     )[0].value;
   return {
+    ...createPresence({ pool, rows }),
+    ...createMemberAccess({ pool, rows, transaction }),
     sources,
     history,
     records,
@@ -244,6 +260,7 @@ export async function createPgStore(pool) {
           "activity",
           "settings",
           "members",
+          "access_settings",
         ])
           result[table] = await rows(db, `SELECT * FROM ppcm.${table}`);
         return result;
@@ -266,6 +283,7 @@ export async function createPgStore(pool) {
       )[0];
       if (
         !member?.active ||
+        member.login_mode !== "supabase" ||
         (member.auth_user_id && member.auth_user_id !== authUser.id)
       )
         return null;
@@ -285,64 +303,5 @@ export async function createPgStore(pool) {
         role: member.role,
       };
     },
-    members: async () =>
-      rows(
-        pool,
-        "SELECT id,email,display_name,role,active,created_at FROM ppcm.members ORDER BY email",
-      ),
-    saveMember: (input, actor) =>
-      transaction(async (db) => {
-        if (
-          typeof input.email !== "string" ||
-          !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email) ||
-          input.email.length > 254 ||
-          !["admin", "editor", "viewer"].includes(input.role) ||
-          typeof input.active !== "boolean" ||
-          typeof input.display_name !== "string" ||
-          !input.display_name.trim() ||
-          input.display_name.length > 80
-        )
-          throw new ValidationError("Revisa el correo, el nombre y el rol.");
-        const email = input.email.trim().toLowerCase();
-        const previous = (
-          await rows(db, "SELECT * FROM ppcm.members WHERE email=$1", [email])
-        )[0];
-        if (
-          previous?.role === "admin" &&
-          previous.active &&
-          (!input.active || input.role !== "admin")
-        ) {
-          const admins = await rows(
-            db,
-            "SELECT id FROM ppcm.members WHERE role='admin' AND active=true",
-          );
-          if (admins.length <= 1)
-            throw new ValidationError(
-              "Debe quedar al menos un administrador activo.",
-            );
-          if (previous.id === actor.id)
-            throw new ValidationError(
-              "Otro administrador debe modificar tu acceso.",
-            );
-        }
-        await db.query(
-          "INSERT INTO ppcm.members(id,email,display_name,role,active) VALUES($1,$2,$3,$4,$5) ON CONFLICT(email) DO UPDATE SET display_name=excluded.display_name,role=excluded.role,active=excluded.active",
-          [
-            previous?.id || randomUUID(),
-            email,
-            input.display_name.trim(),
-            input.role,
-            input.active,
-          ],
-        );
-        await db.query(
-          "INSERT INTO ppcm.activity(record_key,detail) VALUES($1,$2)",
-          [
-            "member",
-            JSON.stringify({ before: previous || null, after: input, actor }),
-          ],
-        );
-        return { ok: true };
-      }),
   };
 }

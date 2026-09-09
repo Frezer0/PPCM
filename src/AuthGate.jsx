@@ -9,15 +9,18 @@ export default function AuthGate() {
     [busy, setBusy] = useState(false);
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState("");
-  const refresh = () =>
-    api("/session")
-      .then(setSession)
-      .catch((e) => setError(e.message));
+  const [name, setName] = useState("");
+  const [credentialsMode, setCredentialsMode] = useState(false);
+  const requiresCredentials =
+    session?.access?.requireCredentials !== false || credentialsMode;
+  const refresh = () => api("/session").then(setSession);
   useEffect(() => {
-    refresh();
+    refresh().catch((e) => setError(e.message));
     const expired = () => {
       setSession((prev) => ({ ...prev, user: null }));
-      setError("Tu sesión venció. Vuelve a ingresar.");
+      setCredentialsMode(false);
+      setError("Tu sesión venció o cambió el acceso. Vuelve a ingresar.");
+      refresh().catch((e) => setError(e.message));
     };
     window.addEventListener("ppcm-session-expired", expired);
     return () => window.removeEventListener("ppcm-session-expired", expired);
@@ -27,14 +30,17 @@ export default function AuthGate() {
     setBusy(true);
     setError("");
     try {
-      await api("/auth/login", {
+      await api(requiresCredentials ? "/auth/login" : "/auth/guest", {
         method: "POST",
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(
+          requiresCredentials ? { email, password } : { name },
+        ),
       });
       setPassword("");
       await refresh();
     } catch (e) {
       setError(e.message);
+      await refresh().catch(() => {});
     } finally {
       setBusy(false);
     }
@@ -42,6 +48,8 @@ export default function AuthGate() {
   async function logout() {
     await api("/auth/logout", { method: "POST", body: "{}" });
     setSession({ ...session, user: null });
+    setCredentialsMode(false);
+    await refresh();
   }
   if (session?.user) return <App session={session} onLogout={logout} />;
   return (
@@ -56,33 +64,53 @@ export default function AuthGate() {
         <span className="eyebrow">GESTIÓN COMPARTIDA</span>
         <h1>Bienvenido a tu espacio.</h1>
         <p>
-          Ingresa para consultar los datos y continuar el seguimiento de tu
-          operación.
+          {requiresCredentials
+            ? "Ingresa para consultar los datos y continuar el seguimiento de tu operación."
+            : "Escribe tu nombre de usuario para consultar el dashboard. No necesitas una cuenta."}
         </p>
         {!session && !error ? (
           <Spinner />
         ) : (
           <form onSubmit={login}>
-            <label className="form-field">
-              Correo electrónico
-              <input
-                type="email"
-                required
-                autoComplete="username"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </label>
-            <label className="form-field">
-              Contraseña
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </label>
+            {requiresCredentials ? (
+              <>
+                <label className="form-field">
+                  Correo electrónico
+                  <input
+                    type="email"
+                    required
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </label>
+                <label className="form-field">
+                  Contraseña
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </label>
+              </>
+            ) : (
+              <label className="form-field">
+                Nombre de usuario
+                <input
+                  type="text"
+                  aria-label="Nombre de usuario"
+                  required
+                  minLength={2}
+                  maxLength={80}
+                  autoComplete="nickname"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+                <small>Acceso de consulta: puedes ver y exportar datos.</small>
+              </label>
+            )}
             {error && (
               <div role="alert" className="error-banner">
                 {error}
@@ -90,9 +118,29 @@ export default function AuthGate() {
             )}
             <button className="button primary full-width" disabled={busy}>
               <LogIn size={17} />
-              {busy ? "Ingresando…" : "Ingresar al dashboard"}
+              {busy
+                ? "Ingresando…"
+                : requiresCredentials
+                  ? "Ingresar al dashboard"
+                  : "Entrar en modo consulta"}
             </button>
           </form>
+        )}
+        {session?.access?.requireCredentials === false && (
+          <button
+            type="button"
+            className="text-button login-mode-button"
+            disabled={busy}
+            onClick={() => {
+              setCredentialsMode(!credentialsMode);
+              setError("");
+              setPassword("");
+            }}
+          >
+            {credentialsMode
+              ? "Entrar solo con nombre de usuario"
+              : "Ingresar con correo y contraseña"}
+          </button>
         )}
         <div className="login-note">
           <LockKeyhole size={15} />

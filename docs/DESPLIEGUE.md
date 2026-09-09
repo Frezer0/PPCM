@@ -21,7 +21,7 @@ En **Authentication → Users**, utiliza la opción para crear un usuario con co
 
 Ese mismo correo se utilizará en la variable `BOOTSTRAP_ADMIN_EMAIL` de Render. El servidor dará acceso de administrador únicamente a esa cuenta confirmada. No basta con que una persona se registre en Supabase: también debe tener acceso activo en la tabla de miembros de PPCM.
 
-Para usuarios adicionales: crea su cuenta en Supabase Auth y después, desde **Usuarios y permisos** en el dashboard, da acceso al mismo correo. Los roles son:
+Para usuarios adicionales: desde **Usuarios y permisos → Crear usuario** en el dashboard, ingresa correo, nombre, contraseña (al menos 8 caracteres) y rol. No hace falta crear estas cuentas previamente en Supabase Auth. **Editar → Nueva contraseña** permite cambiarla; dejar ese campo vacío conserva la actual. Al cambiar una cuenta, sus sesiones del dashboard se cierran y deberá volver a ingresar. Los roles son:
 
 | Rol           | Permisos                                                                           |
 | ------------- | ---------------------------------------------------------------------------------- |
@@ -29,7 +29,20 @@ Para usuarios adicionales: crea su cuenta en Supabase Auth y después, desde **U
 | Editor        | Lo anterior, además de guardar seguimiento e importar Excel                        |
 | Administrador | Lo anterior, además de configuración, usuarios, respaldos y restauración de cargas |
 
-La aplicación no envía invitaciones ni crea cuentas de Supabase automáticamente. La recuperación de acceso se realiza mediante el administrador de Supabase. [Gestión de usuarios](https://supabase.com/docs/guides/auth/managing-user-data).
+La aplicación no envía invitaciones: el administrador crea la cuenta y comunica el acceso por su canal habitual. Las cuentas existentes de Supabase Auth conservan su acceso; si se establece una contraseña desde el dashboard para una de ellas, desde entonces se utiliza esa contraseña en PPCM. Esto no modifica la contraseña de otros servicios de Supabase.
+
+En **Usuarios y permisos → Inicio de sesión**, el administrador puede configurar **Solicitar correo y contraseña al ingresar**:
+
+- **Activado (predeterminado):** todos deben ingresar con correo y contraseña.
+- **Desactivado:** cualquier persona puede escribir un nombre y consultar o exportar los datos. Ese nombre no otorga permisos de edición ni identifica una cuenta registrada.
+- **Ingresar con correo y contraseña** sigue disponible para editores y administradores, incluso con la opción desactivada.
+- Al volver a activarlo, se revocan las sesiones abiertas sin contraseña. La configuración se conserva entre reinicios.
+
+El servidor aplica automáticamente `supabase/migrations/002_member_access.sql` al iniciar la nueva versión. No se requieren nuevas variables de entorno. Las contraseñas y sesiones se guardan en tablas privadas de `ppcm`, sin exponerlas al navegador ni incluirlas en el respaldo JSON.
+
+En **Usuarios y permisos → Conectados y actividad reciente**, solo los administradores pueden ver las cuentas y visitantes que tienen abierto el dashboard. La lista se actualiza cada 30 segundos y considera en línea las conexiones que enviaron una señal en los últimos 90 segundos. Una cuenta aparece una sola vez aunque use varias pestañas o equipos. Cada visitante aparece con el nombre que escribió, sin que eso verifique su identidad.
+
+Cerrar sesión marca ese navegador como desconectado; cerrar una pestaña conserva las otras conexiones de la cuenta. Si no llega el aviso de cierre o se pierde internet, el estado vence al transcurrir 90 segundos. **Última actividad** es la última señal recibida del dashboard, no una medición de uso del teclado o ratón. Se muestran hasta 24 horas de actividad reciente. Estos datos no se incluyen en el historial de mantenimiento ni en el respaldo JSON. La migración automática `003_presence.sql` crea su tabla privada y no necesita servicios o variables adicionales.
 
 ## 3. Crear el servicio en Render
 

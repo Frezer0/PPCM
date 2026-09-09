@@ -74,11 +74,24 @@ app.get("/api/session", async (req, res) =>
     mode: config.cloud ? "cloud" : "local",
     user: await auth.current(req, res),
     publicUrl: config.publicUrl,
+    access: config.cloud ? await store.accessSettings() : { requireCredentials: false },
   }),
 );
 app.post("/api/auth/login", auth.login);
+app.post("/api/auth/guest", auth.guest);
 app.post("/api/auth/logout", auth.logout);
 app.use("/api", auth.required);
+app.post("/api/presence/heartbeat", async (req, res) => {
+  if (!store.recordPresence) return res.json({ ok: true });
+  res.json(await store.recordPresence(req.user, req.presenceSession, req.body?.tabId));
+});
+app.post("/api/presence/leave", async (req, res) => {
+  if (!store.leavePresence) return res.json({ ok: true });
+  res.json(await store.leavePresence(req.user, req.presenceSession, req.body?.tabId));
+});
+app.get("/api/presence", requireRole("admin"), async (_req, res) =>
+  res.json(store.presence ? await store.presence() : { entries: [], onlineWindowSeconds: 90, updatedAt: new Date().toISOString() }),
+);
 app.get("/api/revision", async (_req, res) =>
   res.json({ revision: store.revision ? await store.revision() : "local" }),
 );
@@ -122,6 +135,14 @@ app.put("/api/members", requireRole("admin"), async (req, res) => {
       "Los usuarios se gestionan en el modo compartido.",
     );
   res.json(await store.saveMember(req.body, req.user));
+});
+app.get("/api/access-settings", requireRole("admin"), async (_req, res) =>
+  res.json(store.accessSettings ? await store.accessSettings() : { requireCredentials: false }),
+);
+app.put("/api/access-settings", requireRole("admin"), async (req, res) => {
+  if (!store.saveAccessSettings)
+    throw new ValidationError("El inicio de sesión se configura en el modo compartido.");
+  res.json(await store.saveAccessSettings(req.body, req.user));
 });
 const staging = new Map();
 const purge = () => {

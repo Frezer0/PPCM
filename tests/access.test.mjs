@@ -2,7 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { PGlite } from "@electric-sql/pglite";
 import { createPgStore } from "../server/pg-store.mjs";
-import { createAuth, requireRole } from "../server/auth.mjs";
+import {
+  createAuth,
+  requireRole,
+  requireImportAccess,
+} from "../server/auth.mjs";
 import { randomUUID } from "node:crypto";
 
 async function fixture(t) {
@@ -463,5 +467,72 @@ test("cuentas: rechaza duplicados y contraseñas inválidas, protege último adm
       response(),
     ),
     { status: 429 },
+  );
+});
+
+test("sin contraseña, invitados y cuentas de consulta pueden importar sin obtener permisos de seguimiento", async (t) => {
+  const { store, admin, auth } = await fixture(t);
+  await store.saveMember(
+    account({ email: "consulta@example.test", role: "viewer" }),
+    admin,
+  );
+  const viewer = (await store.members()).find((m) => m.role === "viewer");
+  const guard = requireImportAccess(store);
+  await assert.rejects(
+    guard({ user: viewer }, response(), () => {}),
+    { status: 403 },
+  );
+  await assert.rejects(
+    guard({}, response(), () => {}),
+    { status: 401 },
+  );
+  await store.saveAccessSettings({ requireCredentials: false }, admin);
+  const res = response();
+  await auth.guest(
+    { ip: "import", body: { name: "Visitante que carga" } },
+    res,
+  );
+  const guestRequest = request(res);
+  await auth.required(guestRequest, response(), () => {});
+  for (const user of [guestRequest.user, viewer]) {
+    let allowed = false;
+    await guard({ user }, response(), () => {
+      allowed = true;
+    });
+    assert.equal(allowed, true);
+    assert.throws(
+      () => requireRole("admin", "editor")({ user }, response(), () => {}),
+      { status: 403 },
+    );
+    assert.throws(() => requireRole("admin")({ user }, response(), () => {}), {
+      status: 403,
+    });
+  }
+  await store.importDatasets(
+    [
+      {
+        type: "order",
+        filename: "visitante.xlsx",
+        rowCount: 1,
+        records: [
+          {
+            key: "order:10001",
+            id: "10001",
+            type: "order",
+            description: "Orden de visitante",
+          },
+        ],
+        warnings: [],
+      },
+    ],
+    guestRequest.user,
+  );
+  assert.equal((await store.sources())[0].importedBy, "Visitante que carga");
+  assert.equal((await store.activity("import"))[0].detail.actor.guest, true);
+  await store.saveAccessSettings({ requireCredentials: true }, admin);
+  assert.equal(await auth.current(guestRequest, response()), null);
+  await assert.rejects(
+    guard({ user: viewer }, response(), () => {}),
+    { status: 403 },
   );
 });

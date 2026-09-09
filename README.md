@@ -28,7 +28,7 @@ Para publicar, sigue [la guía de despliegue](docs/DESPLIEGUE.md). `render.yaml`
 - Gestión de miembros y actualización de datos compartidos cada 30 segundos cuando no hay una edición abierta.
 - Creación y cambio de contraseñas desde **Usuarios y permisos**, sin crear previamente la cuenta en Supabase.
 - Lista de **Conectados y actividad reciente** para administradores: cuentas y visitantes, rol, estado de conexión y última señal del dashboard. Se actualiza cada 30 segundos; después de 90 segundos sin señales se muestra desconectado. Agrupa las pestañas y equipos de una cuenta y conserva las conexiones recientes de las últimas 24 horas.
-- Interruptor de **Inicio de sesión** para administradores: activado solicita correo y contraseña; desactivado permite entrar con cualquier nombre, solo para consultar y exportar. La edición y la administración siempre requieren una cuenta con contraseña.
+- Interruptor de **Inicio de sesión** para administradores: activado solicita correo y contraseña; desactivado permite entrar con cualquier nombre, para consultar, exportar y subir archivos. El seguimiento y la administración requieren los permisos de una cuenta con contraseña.
 
 ## Usar localmente para desarrollo o trabajo individual
 
@@ -56,7 +56,7 @@ Las reglas de asignación y prioridad están en `shared/domain.mjs`. Un responsa
 
 Los administradores pueden descargar un JSON con datos, cargas, seguimiento y configuración. Para copiar la base SQLite directamente, detén el servicio y respalda toda la carpeta `data`.
 
-El ingreso con correo y contraseña está activado por defecto. Al reactivarlo, se revocan las sesiones de consulta sin contraseña; sus próximas solicitudes pedirán ingresar de nuevo. Las sesiones de consulta duran hasta 12 horas. Las contraseñas se almacenan mediante hashes scrypt y no se incluyen en respuestas, historial ni respaldos JSON. Tampoco se exportan los tokens de sesión. Si restauras las cuentas desde un respaldo JSON, deberás establecer nuevamente sus contraseñas.
+El ingreso con correo y contraseña está activado por defecto. Al reactivarlo, se revocan las sesiones sin contraseña; sus próximas solicitudes pedirán ingresar de nuevo. Las sesiones de visitantes duran hasta 12 horas. Las contraseñas se almacenan mediante hashes scrypt y no se incluyen en respuestas, historial ni respaldos JSON. Tampoco se exportan los tokens de sesión. Si restauras las cuentas desde un respaldo JSON, deberás establecer nuevamente sus contraseñas.
 
 ## Compilar Windows
 

@@ -68,15 +68,15 @@ export function AccessSettings({ notify }) {
               </span>
             </label>
             <p className="access-description">
-              La edición y la administración siempre solicitan correo y
+              Los cambios de seguimiento y la administración solicitan correo y
               contraseña. Al activar esta opción se cerrarán los accesos
               abiertos sin contraseña.
             </p>
             {!enabled && (
               <p className="info-banner">
                 Cualquier persona que escriba un nombre podrá consultar los
-                datos y exportarlos. No podrá editar, importar ni administrar
-                usuarios.
+                datos, exportarlos y subir archivos de mantenimiento. Los
+                permisos de seguimiento y administración se conservan.
               </p>
             )}
             <button

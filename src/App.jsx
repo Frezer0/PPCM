@@ -130,6 +130,11 @@ export default function App({ session, onLogout }) {
   const currentUser = data?.currentUser || session.user;
   const canEdit = currentUser.role !== "viewer";
   const isAdmin = currentUser.role === "admin";
+  const requireCredentials =
+    data?.access?.requireCredentials ??
+    session.access?.requireCredentials ??
+    true;
+  const canImport = canEdit || !requireCredentials;
   const allowedNav = NAV.filter(
     (n) =>
       !(["settings", "members"].includes(n.key) && !isAdmin) &&
@@ -194,8 +199,8 @@ export default function App({ session, onLogout }) {
       setPage("overview");
       location.hash = "overview";
     }
-    if (!canEdit) setImporting(false);
-  }, [currentUser.role, session.mode, page]);
+    if (!canImport) setImporting(false);
+  }, [currentUser.role, session.mode, page, canImport]);
   useEffect(() => {
     const handler = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -275,51 +280,53 @@ export default function App({ session, onLogout }) {
             PPCM<small>MANTENIMIENTO</small>
           </span>
         </button>
-        <div className="workspace-card">
-          <span className="workspace-icon">
-            <Leaf size={18} />
-          </span>
-          <div>
-            <strong>
-              {data?.settings.workspaceName || "Operaciones forestales"}
-            </strong>
-            <small>Espacio de trabajo</small>
+        <div className="sidebar-scroll">
+          <div className="workspace-card">
+            <span className="workspace-icon">
+              <Leaf size={18} />
+            </span>
+            <div>
+              <strong>
+                {data?.settings.workspaceName || "Operaciones forestales"}
+              </strong>
+              <small>Espacio de trabajo</small>
+            </div>
           </div>
+          <p className="nav-label">GESTIÓN OPERACIONAL</p>
+          <nav aria-label="Navegación principal">
+            {NAV.slice(0, 6).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => navigate(key)}
+                className={`nav-item ${page === key ? "active" : ""}`}
+                aria-current={page === key ? "page" : undefined}
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+                {key === "orders" && data && (
+                  <small>{integer(stats.orders)}</small>
+                )}
+                {key === "notices" && data && (
+                  <small>{integer(stats.notices)}</small>
+                )}
+              </button>
+            ))}
+          </nav>
+          <p className="nav-label data-nav-label">ESPACIO DE TRABAJO</p>
+          <nav aria-label="Administración">
+            {allowedNav.slice(6).map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                onClick={() => navigate(key)}
+                className={`nav-item ${page === key ? "active" : ""}`}
+                aria-current={page === key ? "page" : undefined}
+              >
+                <Icon size={18} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
         </div>
-        <p className="nav-label">GESTIÓN OPERACIONAL</p>
-        <nav aria-label="Navegación principal">
-          {NAV.slice(0, 6).map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => navigate(key)}
-              className={`nav-item ${page === key ? "active" : ""}`}
-              aria-current={page === key ? "page" : undefined}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-              {key === "orders" && data && (
-                <small>{integer(stats.orders)}</small>
-              )}
-              {key === "notices" && data && (
-                <small>{integer(stats.notices)}</small>
-              )}
-            </button>
-          ))}
-        </nav>
-        <p className="nav-label data-nav-label">ESPACIO DE TRABAJO</p>
-        <nav aria-label="Administración">
-          {allowedNav.slice(6).map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              onClick={() => navigate(key)}
-              className={`nav-item ${page === key ? "active" : ""}`}
-              aria-current={page === key ? "page" : undefined}
-            >
-              <Icon size={18} />
-              <span>{label}</span>
-            </button>
-          ))}
-        </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-tip">
             <span className="tip-icon">
@@ -330,7 +337,7 @@ export default function App({ session, onLogout }) {
               Mantén tus exportaciones SAP actualizadas para una visión precisa
               de la operación.
             </p>
-            {canEdit && (
+            {canImport && (
               <button onClick={() => setImporting(true)}>
                 Actualizar archivos
                 <ArrowUpRight size={15} />
@@ -439,7 +446,7 @@ export default function App({ session, onLogout }) {
                   Exportar
                 </button>
               )}
-              {canEdit && (
+              {canImport && (
                 <button
                   className="button primary"
                   onClick={() => setImporting(true)}
@@ -498,7 +505,7 @@ export default function App({ session, onLogout }) {
                   <EmptyState
                     title="Comienza con tus archivos de mantenimiento"
                     action={
-                      canEdit && (
+                      canImport && (
                         <button
                           className="button primary"
                           onClick={() => setImporting(true)}
@@ -509,7 +516,7 @@ export default function App({ session, onLogout }) {
                       )
                     }
                   >
-                    {canEdit
+                    {canImport
                       ? "Importa Avisos IW28 y OMs IW38 para ver tus indicadores."
                       : "Un editor o administrador debe cargar los archivos de mantenimiento para comenzar."}
                   </EmptyState>
@@ -563,7 +570,7 @@ export default function App({ session, onLogout }) {
                   )}
                   {page === "sources" && (
                     <Sources
-                      canEdit={canEdit}
+                      canImport={canImport}
                       isAdmin={isAdmin}
                       data={data}
                       onImport={() => setImporting(true)}
@@ -600,7 +607,7 @@ export default function App({ session, onLogout }) {
           </footer>
         </main>
       </div>
-      {importing && canEdit && (
+      {importing && canImport && (
         <ImportDialog
           onClose={() => setImporting(false)}
           onImported={refresh}

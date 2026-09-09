@@ -248,6 +248,19 @@ export function createAuth({
     },
   };
 }
+export const requireImportAccess = (store) => async (req, _res, next) => {
+  if (!req.user) throw fail("Inicia sesión para acceder al dashboard.");
+  if (
+    ["admin", "editor"].includes(req.user.role) ||
+    (store.accessSettings &&
+      (await store.accessSettings()).requireCredentials === false)
+  ) {
+    next();
+    return;
+  }
+  throw fail("Tu cuenta no tiene permiso para importar archivos.", 403);
+};
+
 export const requireRole =
   (...roles) =>
   (req, _res, next) => {

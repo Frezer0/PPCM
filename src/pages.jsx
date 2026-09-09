@@ -661,7 +661,7 @@ export function Audit({ records, onOpen, onExport, currency, focused }) {
   );
 }
 export function Sources({
-  canEdit = true,
+  canImport = true,
   isAdmin = true,
   data,
   onImport,
@@ -721,7 +721,11 @@ export function Sources({
                   Hoja<b>{source?.sheet || "—"}</b>
                 </span>
               </div>
-              <button className="button" disabled={!canEdit} onClick={onImport}>
+              <button
+                className="button"
+                disabled={!canImport}
+                onClick={onImport}
+              >
                 <FileSpreadsheet size={16} />
                 Actualizar archivo
               </button>

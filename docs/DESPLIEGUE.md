@@ -34,7 +34,7 @@ La aplicación no envía invitaciones: el administrador crea la cuenta y comunic
 En **Usuarios y permisos → Inicio de sesión**, el administrador puede configurar **Solicitar correo y contraseña al ingresar**:
 
 - **Activado (predeterminado):** todos deben ingresar con correo y contraseña.
-- **Desactivado:** cualquier persona puede escribir un nombre y consultar o exportar los datos. Ese nombre no otorga permisos de edición ni identifica una cuenta registrada.
+- **Desactivado:** cualquier persona puede escribir un nombre para consultar, exportar y subir archivos. También pueden subir archivos las cuentas de consulta mientras la opción esté desactivada. El nombre del visitante no otorga permisos para cambiar seguimientos, restaurar cargas o administrar usuarios.
 - **Ingresar con correo y contraseña** sigue disponible para editores y administradores, incluso con la opción desactivada.
 - Al volver a activarlo, se revocan las sesiones abiertas sin contraseña. La configuración se conserva entre reinicios.
 

@@ -66,7 +66,7 @@ export default function AuthGate() {
         <p>
           {requiresCredentials
             ? "Ingresa para consultar los datos y continuar el seguimiento de tu operación."
-            : "Escribe tu nombre de usuario para consultar el dashboard. No necesitas una cuenta."}
+            : "Escribe tu nombre de usuario para entrar al dashboard. No necesitas una cuenta."}
         </p>
         {!session && !error ? (
           <Spinner />
@@ -108,7 +108,9 @@ export default function AuthGate() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                 />
-                <small>Acceso de consulta: puedes ver y exportar datos.</small>
+                <small>
+                  Puedes consultar, exportar y subir archivos de mantenimiento.
+                </small>
               </label>
             )}
             {error && (
@@ -122,7 +124,7 @@ export default function AuthGate() {
                 ? "Ingresando…"
                 : requiresCredentials
                   ? "Ingresar al dashboard"
-                  : "Entrar en modo consulta"}
+                  : "Entrar al dashboard"}
             </button>
           </form>
         )}

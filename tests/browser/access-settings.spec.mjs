@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-test("administrador configura ingreso, crea contraseña y comprueba consulta solo con nombre", async ({
+test("administrador configura ingreso, crea contraseña y comprueba acceso e importación solo con nombre", async ({
   page,
   request,
 }) => {
@@ -29,7 +29,13 @@ test("administrador configura ingreso, crea contraseña y comprueba consulta sol
   );
   await page.route("**/api/data", (route) =>
     route.fulfill({
-      json: { ...source, currentUser, mode: "cloud", revision: "1" },
+      json: {
+        ...source,
+        currentUser,
+        mode: "cloud",
+        revision: "1",
+        access: { requireCredentials },
+      },
     }),
   );
   await page.route("**/api/revision", (route) =>
@@ -50,6 +56,32 @@ test("administrador configura ingreso, crea contraseña y comprueba consulta sol
       return route.fulfill({ json: { ok: true } });
     }
     return route.fulfill({ json: members });
+  });
+  let guestImports = 0;
+  await page.route("**/api/import/preview", (route) =>
+    route.fulfill({
+      json: {
+        type: "order",
+        filename: "OMs IW38.xlsx",
+        sheet: "Órdenes",
+        rowCount: 2727,
+        token: "guest-preview",
+        warnings: [],
+        added: 0,
+        removed: 0,
+        existing: 2727,
+        sample: [],
+      },
+    }),
+  );
+  await page.route("**/api/import/commit", (route) => {
+    expect(currentUser.guest).toBe(true);
+    expect(requireCredentials).toBe(false);
+    expect(route.request().postDataJSON()).toEqual({
+      tokens: ["guest-preview"],
+    });
+    guestImports++;
+    return route.fulfill({ json: { sources: source.sources } });
   });
   await page.route("**/api/auth/logout", (route) => {
     currentUser = null;
@@ -141,7 +173,7 @@ test("administrador configura ingreso, crea contraseña y comprueba consulta sol
     path: "test-results/guest-login.png",
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Entrar en modo consulta" }).click();
+  await page.getByRole("button", { name: "Entrar al dashboard" }).click();
   await expect(
     page.getByRole("heading", {
       name: "Resumen de mantenimiento",
@@ -153,10 +185,24 @@ test("administrador configura ingreso, crea contraseña y comprueba consulta sol
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Actualizar datos", exact: true }),
-  ).toHaveCount(0);
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Exportar", exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Actualizar datos", exact: true })
+    .click();
+  await page
+    .getByLabel("Seleccionar archivos Excel")
+    .setInputFiles("OMs IW38.xlsx");
+  await expect(
+    page.getByRole("button", { name: "Confirmar importación", exact: false }),
+  ).toBeEnabled();
+  await page
+    .getByRole("button", { name: "Confirmar importación", exact: false })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(guestImports).toBe(1);
   await page.getByTitle("Cerrar sesión").click();
   await page
     .getByRole("button", { name: "Ingresar con correo y contraseña" })
@@ -212,7 +258,7 @@ test("el formulario actualiza el modo cuando el administrador lo cambia antes de
   });
   await page.goto("/");
   await page.getByLabel("Nombre de usuario", { exact: false }).fill("Visita");
-  await page.getByRole("button", { name: "Entrar en modo consulta" }).click();
+  await page.getByRole("button", { name: "Entrar al dashboard" }).click();
   await expect(
     page.getByLabel("Correo electrónico", { exact: true }),
   ).toBeVisible();

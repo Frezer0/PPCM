@@ -74,7 +74,13 @@ test("acceso compartido: login, permisos de consulta y gestión de miembros", as
   });
   await page.route("**/api/data", (route) =>
     route.fulfill({
-      json: { ...source, mode: "cloud", currentUser: user(), revision: "1" },
+      json: {
+        ...source,
+        mode: "cloud",
+        currentUser: user(),
+        revision: "1",
+        access: { requireCredentials: true },
+      },
     }),
   );
   await page.route("**/api/revision", (route) =>

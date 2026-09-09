@@ -117,9 +117,7 @@ export function OnlineUsers() {
                       )}
                     </td>
                     <td>
-                      {entry.guest
-                        ? "Visitante · consulta"
-                        : roleLabels[entry.role]}
+                      {entry.guest ? "Visitante" : roleLabels[entry.role]}
                     </td>
                     <td>
                       <span

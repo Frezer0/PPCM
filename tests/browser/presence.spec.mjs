@@ -9,7 +9,13 @@ async function cloud(page, request, user) {
   );
   await page.route("**/api/data", (route) =>
     route.fulfill({
-      json: { ...source, currentUser: user, mode: "cloud", revision: "1" },
+      json: {
+        ...source,
+        currentUser: user,
+        mode: "cloud",
+        revision: "1",
+        access: { requireCredentials: true },
+      },
     }),
   );
   await page.route("**/api/revision", (route) =>

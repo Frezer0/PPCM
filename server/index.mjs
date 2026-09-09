@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { createStore } from "./store.mjs";
-import { createAuth, requireRole } from "./auth.mjs";
+import { createAuth, requireRole, requireImportAccess } from "./auth.mjs";
 import { configuration } from "./config.mjs";
 import { databaseConfiguration } from "./database-config.mjs";
 import { clientDownloads } from "./client-download.mjs";
@@ -114,6 +114,7 @@ app.get("/api/data", async (req, res) => {
   res.json({
     ...data,
     currentUser: req.user,
+    access: config.cloud ? await store.accessSettings() : { requireCredentials: false },
     mode: config.cloud ? "cloud" : "local",
   });
 });
@@ -151,7 +152,7 @@ const purge = () => {
 };
 app.post(
   "/api/import/preview",
-  requireRole("admin", "editor"),
+  requireImportAccess(store),
   express.raw({ type: "application/octet-stream", limit: "10mb" }),
   async (req, res) => {
     purge();
@@ -196,7 +197,7 @@ app.post(
 );
 app.post(
   "/api/import/commit",
-  requireRole("admin", "editor"),
+  requireImportAccess(store),
   async (req, res) => {
     purge();
     const tokens = req.body.tokens;

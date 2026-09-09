@@ -357,7 +357,7 @@ export function Workload({ records, onPlanner, onExport }) {
             }
           >
             <Download size={15} />
-            Exportar ?rdenes del per?odo
+            Exportar órdenes del período
           </button>
         </div>
       </section>
